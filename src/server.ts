@@ -31,5 +31,18 @@ function createServer() {
     },
   );
 
+  server.registerTool(
+    "ping",
+    {
+      title: "Ping",
+      description: "A simple ping tool for testing",
+    },
+    async () => {
+      return {
+        content: [{ type: "text", text: "pong" }],
+      };
+    },
+  );
+
   return server;
 }

@@ -39,6 +39,7 @@ describe("MCP Server", () => {
 
   it("should be able to connect to the server", async () => {
     const tools = await client.listTools();
-    assertEquals(tools.tools.length, 0);
+    assertEquals(tools.tools.length, 1);
+    assertEquals(tools.tools[0].name, "ping");
   });
 });
