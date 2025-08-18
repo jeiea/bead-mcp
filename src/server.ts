@@ -2,9 +2,7 @@ import { McpServer, ResourceTemplate } from "npm:@modelcontextprotocol/sdk@^1/se
 import { StdioServerTransport } from "npm:@modelcontextprotocol/sdk@^1/server/stdio.js";
 import { getGitRepoDefaultBranch } from "./get_default_branch.ts";
 
-main();
-
-async function main() {
+export async function main() {
   const server = createServer();
   const transport = new StdioServerTransport();
   await server.connect(transport);
