@@ -1,86 +1,37 @@
-import express from "npm:express";
-import { randomUUID } from "node:crypto";
-import { McpServer } from "npm:@modelcontextprotocol/sdk@^1/server/mcp.js";
-import { StreamableHTTPServerTransport } from "npm:@modelcontextprotocol/sdk@^1/server/streamableHttp.js";
-import { isInitializeRequest } from "npm:@modelcontextprotocol/sdk@^1/types.js";
+import { McpServer, ResourceTemplate } from "npm:@modelcontextprotocol/sdk@^1/server/mcp.js";
+import { StdioServerTransport } from "npm:@modelcontextprotocol/sdk@^1/server/stdio.js";
+import { getGitRepoDefaultBranch } from "./get_default_branch.ts";
 
-const app = express();
-app.use(express.json());
+main();
 
-// Map to store transports by session ID
-const transports: { [sessionId: string]: StreamableHTTPServerTransport } = {};
+async function main() {
+  const server = createServer();
+  const transport = new StdioServerTransport();
+  await server.connect(transport);
+}
 
-// Handle POST requests for client-to-server communication
-app.post("/mcp", async (req, res) => {
-  // Check for existing session ID
-  const sessionId = req.headers["mcp-session-id"] as string | undefined;
-  let transport: StreamableHTTPServerTransport;
+function createServer() {
+  const server = new McpServer({
+    name: "bead-mcp",
+    version: "1.0.0",
+  });
 
-  if (sessionId && transports[sessionId]) {
-    // Reuse existing transport
-    transport = transports[sessionId];
-  } else if (!sessionId && isInitializeRequest(req.body)) {
-    // New initialization request
-    transport = new StreamableHTTPServerTransport({
-      sessionIdGenerator: () => randomUUID(),
-      onsessioninitialized: (sessionId) => {
-        // Store the transport by session ID
-        transports[sessionId] = transport;
-      },
-      // DNS rebinding protection is disabled by default for backwards compatibility. If you are running this server
-      // locally, make sure to set:
-      enableDnsRebindingProtection: true,
-      allowedHosts: ["localhost"],
-    });
+  server.registerResource(
+    "git-repo-default-branch",
+    new ResourceTemplate("resource://{path}/default-branch.txt", { list: undefined }),
+    {
+      title: "Git Repo Default Branch",
+      description: "Get the default branch of a git repository",
+      icon: "git",
+      tags: ["git", "repository"],
+      mimeType: "text/plain",
+    },
+    async (uri, { path }) => {
+      console.log(`uri: ${uri}, path: ${path}`);
+      const defaultBranch = await getGitRepoDefaultBranch(path as string);
+      return { contents: [{ uri: `${uri}`, text: defaultBranch }] };
+    },
+  );
 
-    // Clean up transport when closed
-    transport.onclose = () => {
-      if (transport.sessionId) {
-        delete transports[transport.sessionId];
-      }
-    };
-    const server = new McpServer({
-      name: "example-server",
-      version: "1.0.0",
-    });
-
-    // ... set up server resources, tools, and prompts ...
-
-    // Connect to the MCP server
-    await server.connect(transport);
-  } else {
-    // Invalid request
-    res.status(400).json({
-      jsonrpc: "2.0",
-      error: {
-        code: -32000,
-        message: "Bad Request: No valid session ID provided",
-      },
-      id: null,
-    });
-    return;
-  }
-
-  // Handle the request
-  await transport.handleRequest(req, res, req.body);
-});
-
-// Reusable handler for GET and DELETE requests
-const handleSessionRequest = async (req: express.Request, res: express.Response) => {
-  const sessionId = req.headers["mcp-session-id"] as string | undefined;
-  if (!sessionId || !transports[sessionId]) {
-    res.status(400).send("Invalid or missing session ID");
-    return;
-  }
-
-  const transport = transports[sessionId];
-  await transport.handleRequest(req, res);
-};
-
-// Handle GET requests for server-to-client notifications via SSE
-app.get("/mcp", handleSessionRequest);
-
-// Handle DELETE requests for session termination
-app.delete("/mcp", handleSessionRequest);
-
-app.listen(3000);
+  return server;
+}
