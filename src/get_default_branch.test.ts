@@ -1,114 +1,121 @@
-import { assertEquals, assertRejects } from "jsr:@std/assert@^1";
-import { restore, stub } from "jsr:@std/testing@^1/mock";
-import { getGitRepoDefaultBranch } from "./get_default_branch.ts";
+import { assertEquals } from "jsr:@std/assert@^1";
+import { _internals, getGitRepoDefaultBranch } from "./get_default_branch.ts";
 
-Deno.test("returns default branch when git command succeeds", async () => {
-  stub(Deno, "Command", () =>
-    mockCommand(`* remote origin
+const { extractRemotesFromConfig, getBranchUpstream, extractDefaultBranch } = _internals;
+
+Deno.test("extractRemotesFromConfig extracts single remote", () => {
+  const config = `user.name=John Doe
+remote.origin.url=https://github.com/example/repo.git
+remote.origin.fetch=+refs/heads/*:refs/remotes/origin/*`;
+
+  const remotes = extractRemotesFromConfig(config);
+  assertEquals(remotes, ["origin"]);
+});
+
+Deno.test("extractRemotesFromConfig extracts multiple remotes", () => {
+  const config = `user.name=John Doe
+remote.origin.url=https://github.com/example/repo.git
+remote.upstream.url=https://github.com/upstream/repo.git
+remote.fork.url=https://github.com/fork/repo.git`;
+
+  const remotes = extractRemotesFromConfig(config);
+  assertEquals(remotes, ["origin", "upstream", "fork"]);
+});
+
+Deno.test("extractRemotesFromConfig returns empty array when no remotes", () => {
+  const config = `user.name=John Doe
+user.email=john@example.com`;
+
+  const remotes = extractRemotesFromConfig(config);
+  assertEquals(remotes, []);
+});
+
+Deno.test("getBranchUpstream returns correct remote for branch", () => {
+  const config = `branch.main.remote=origin
+branch.main.merge=refs/heads/main
+branch.develop.remote=upstream`;
+
+  const remote = getBranchUpstream(config, "main");
+  assertEquals(remote, "origin");
+});
+
+Deno.test("getBranchUpstream returns correct remote for another branch", () => {
+  const config = `branch.main.remote=origin
+branch.develop.remote=upstream
+branch.feature.remote=fork`;
+
+  const remote = getBranchUpstream(config, "develop");
+  assertEquals(remote, "upstream");
+});
+
+Deno.test("getBranchUpstream returns undefined when branch has no remote", () => {
+  const config = `branch.main.remote=origin
+branch.main.merge=refs/heads/main`;
+
+  const remote = getBranchUpstream(config, "feature");
+  assertEquals(remote, undefined);
+});
+
+Deno.test("getBranchUpstream handles branch names with special characters", () => {
+  const config = `branch.feature/test-123.remote=origin
+branch.feature/test-123.merge=refs/heads/feature/test-123`;
+
+  const remote = getBranchUpstream(config, "feature/test-123");
+  assertEquals(remote, "origin");
+});
+
+Deno.test("extractDefaultBranch extracts main as default branch", () => {
+  const stdout = `* remote origin
   Fetch URL: https://github.com/example/repo.git
   Push  URL: https://github.com/example/repo.git
   HEAD branch: main
   Remote branches:
     develop tracked
-    main    tracked`),
-  );
+    main    tracked`;
 
-  try {
-    const result = await getGitRepoDefaultBranch("/fake/path");
-    assertEquals(result, "main");
-  } finally {
-    restore();
-  }
+  const branch = extractDefaultBranch(stdout);
+  assertEquals(branch, "main");
 });
 
-Deno.test("returns master when it's the default branch", async () => {
-  stub(Deno, "Command", () =>
-    mockCommand(`* remote origin
+Deno.test("extractDefaultBranch extracts master as default branch", () => {
+  const stdout = `* remote origin
   Fetch URL: https://github.com/example/repo.git
   Push  URL: https://github.com/example/repo.git
   HEAD branch: master
   Remote branches:
     develop tracked
-    master  tracked`),
-  );
+    master  tracked`;
 
-  try {
-    const result = await getGitRepoDefaultBranch("/fake/path");
-    assertEquals(result, "master");
-  } finally {
-    restore();
-  }
+  const branch = extractDefaultBranch(stdout);
+  assertEquals(branch, "master");
 });
 
-Deno.test("throws error when default branch not found", async () => {
-  stub(Deno, "Command", () =>
-    mockCommand(`* remote origin
-  Fetch URL: https://github.com/example/repo.git
-  Push  URL: https://github.com/example/repo.git
-  Remote branches:
-    develop tracked`),
-  );
-
-  try {
-    await assertRejects(
-      async () => await getGitRepoDefaultBranch("/fake/path"),
-      Error,
-      "default branch not found",
-    );
-  } finally {
-    restore();
-  }
-});
-
-Deno.test("handles custom branch names", async () => {
-  stub(Deno, "Command", () =>
-    mockCommand(`* remote origin
+Deno.test("extractDefaultBranch extracts custom branch name", () => {
+  const stdout = `* remote origin
   Fetch URL: https://github.com/example/repo.git
   Push  URL: https://github.com/example/repo.git
   HEAD branch: production
   Remote branches:
     develop tracked
-    production tracked`),
-  );
+    production tracked`;
 
-  try {
-    const result = await getGitRepoDefaultBranch("/fake/path");
-    assertEquals(result, "production");
-  } finally {
-    restore();
-  }
+  const branch = extractDefaultBranch(stdout);
+  assertEquals(branch, "production");
 });
 
-Deno.test("throws error when git command fails", async () => {
-  stub(Deno, "Command", () =>
-    mockCommand(
-      "fatal: 'origin' does not appear to be a git repository",
-      128,
-      false,
-    ),
-  );
+Deno.test("extractDefaultBranch returns undefined when no HEAD branch", () => {
+  const stdout = `* remote origin
+  Fetch URL: https://github.com/example/repo.git
+  Push  URL: https://github.com/example/repo.git
+  Remote branches:
+    develop tracked
+    main    tracked`;
 
-  try {
-    await assertRejects(
-      async () => await getGitRepoDefaultBranch("/fake/path"),
-      Error,
-      "default branch not found",
-    );
-  } finally {
-    restore();
-  }
+  const branch = extractDefaultBranch(stdout);
+  assertEquals(branch, undefined);
 });
 
-function mockCommand(result: string, code = 0, success = true) {
-  return {
-    spawn: () => ({
-      output: () =>
-        Promise.resolve({
-          stdout: new TextEncoder().encode(result),
-          stderr: new Uint8Array(),
-          code,
-          success,
-        }),
-    }),
-  };
-}
+Deno.test("getGitRepoDefaultBranch returns result in real world", async () => {
+  const result = await getGitRepoDefaultBranch(".");
+  assertEquals(result, "refs/remotes/origin/main");
+});
