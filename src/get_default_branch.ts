@@ -1,4 +1,5 @@
-import { which } from "jsr:@david/which@^0.4";
+import { getCurrentBranch, runGitCommand } from "./git_commands.ts";
+import { whichGit } from "./which_git.ts";
 
 export const _internals = {
   extractRemotesFromConfig,
@@ -7,11 +8,15 @@ export const _internals = {
 };
 
 export async function getGitRepoDefaultBranch(path: string) {
-  const git = await which("git");
-  if (!git) {
-    throw new Error("git not found");
-  }
+  const git = await whichGit();
+  const currentBranch = await getCurrentBranch(git, path);
+  return await getDefaultBranch(path, { git, sourceBranch: currentBranch });
+}
 
+export async function getDefaultBranch(
+  path: string,
+  { git, sourceBranch }: { git: string; sourceBranch: string },
+) {
   const config = await runGitCommand(["config", "--list"], { git, cwd: path });
   const remotes = extractRemotesFromConfig(config);
   const firstRemote = remotes[0];
@@ -19,13 +24,7 @@ export async function getGitRepoDefaultBranch(path: string) {
     throw new Error("no remote found");
   }
 
-  const currentBranch = await runGitCommand(["rev-parse", "--abbrev-ref=strict", "HEAD"], {
-    git,
-    cwd: path,
-  });
-
-  const branchRemote = getBranchUpstream(config, currentBranch);
-  const remote = branchRemote ?? firstRemote;
+  const remote = getBranchUpstream(config, sourceBranch) ?? firstRemote;
 
   const stdout = await runGitCommand(["remote", "show", remote], { git, cwd: path });
   const defaultBranch = extractDefaultBranch(stdout);
@@ -46,11 +45,4 @@ function getBranchUpstream(config: string, currentBranch: string) {
 
 function extractDefaultBranch(stdout: string) {
   return stdout.match(/HEAD branch: (.*)/)?.[1];
-}
-
-async function runGitCommand(args: string[], { git, cwd }: { git: string; cwd: string }) {
-  const command = new Deno.Command(git, { args, cwd });
-  const output = await command.output();
-  const stdout = new TextDecoder().decode(output.stdout);
-  return stdout;
 }
