@@ -1,3 +1,3 @@
-import { main } from "../src/server.ts";
+import { runServer } from "../src/server.ts";
 
-main();
+await runServer();

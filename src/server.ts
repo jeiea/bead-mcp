@@ -1,48 +1,56 @@
-import { McpServer, ResourceTemplate } from "npm:@modelcontextprotocol/sdk@^1/server/mcp.js";
+import { McpServer } from "npm:@modelcontextprotocol/sdk@^1/server/mcp.js";
 import { StdioServerTransport } from "npm:@modelcontextprotocol/sdk@^1/server/stdio.js";
+import { z } from "npm:zod@^3";
 import { getGitRepoDefaultBranch } from "./get_default_branch.ts";
 
-export async function main() {
+export async function runServer() {
   const server = createServer();
   const transport = new StdioServerTransport();
-  await server.connect(transport);
+  transport.onerror = logError;
+  server.server.onerror = logError;
+
+  try {
+    await server.connect(transport);
+  } catch (error) {
+    Deno.writeTextFile("error.log", `${error}\n`, { append: true });
+  }
+
+  return server;
 }
 
-function createServer() {
+export function createServer() {
   const server = new McpServer({
     name: "bead-mcp",
     version: "1.0.0",
   });
 
-  server.registerResource(
-    "git-repo-default-branch",
-    new ResourceTemplate("resource://{path}/default-branch.txt", { list: undefined }),
-    {
-      title: "Git Repo Default Branch",
-      description: "Get the default branch of a git repository",
-      icon: "git",
-      tags: ["git", "repository"],
-      mimeType: "text/plain",
-    },
-    async (uri, { path }) => {
-      console.log(`uri: ${uri}, path: ${path}`);
-      const defaultBranch = await getGitRepoDefaultBranch(path as string);
-      return { contents: [{ uri: `${uri}`, text: defaultBranch }] };
-    },
-  );
-
   server.registerTool(
-    "ping",
+    "get-default-branch",
     {
-      title: "Ping",
-      description: "A simple ping tool for testing",
+      title: "Get Default Branch",
+      description: "Get the default branch of a git repository",
+      annotations: {
+        readOnlyHint: true,
+        openWorldHint: true,
+      },
+      inputSchema: {
+        path: z.string(),
+      },
     },
-    async () => {
-      return {
-        content: [{ type: "text", text: "pong" }],
-      };
+    async (args) => {
+      try {
+        const defaultBranch = await getGitRepoDefaultBranch(args.path);
+        return { content: [{ type: "text", text: defaultBranch }] };
+      } catch (error) {
+        logError(error);
+        return { content: [{ type: "text", text: "Error getting default branch" }] };
+      }
     },
   );
 
   return server;
+}
+
+async function logError(error: unknown) {
+  await Deno.writeTextFile("error.log", `${error}\n`, { append: true });
 }
