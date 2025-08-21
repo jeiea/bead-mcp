@@ -6,8 +6,6 @@ import { getGitRepoDefaultBranch } from "./get_default_branch.ts";
 export async function runServer() {
   const server = createServer();
   const transport = new StdioServerTransport();
-  transport.onerror = logError;
-  server.server.onerror = logError;
 
   try {
     await server.connect(transport);
@@ -42,15 +40,10 @@ export function createServer() {
         const defaultBranch = await getGitRepoDefaultBranch(args.path);
         return { content: [{ type: "text", text: defaultBranch }] };
       } catch (error) {
-        logError(error);
-        return { content: [{ type: "text", text: "Error getting default branch" }] };
+        return { content: [{ type: "text", text: `Error getting default branch: ${error}` }] };
       }
     },
   );
 
   return server;
-}
-
-async function logError(error: unknown) {
-  await Deno.writeTextFile("error.log", `${error}\n`, { append: true });
 }
