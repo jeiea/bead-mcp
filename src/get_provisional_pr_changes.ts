@@ -9,7 +9,11 @@ export async function getProvisionalPrChanges(path: string) {
   const defaultBranch = await getDefaultBranch(path, { git, sourceBranch: currentBranch });
 
   const params = { git, cwd: path, trimEnd: true };
+  const messages = await runGitCommand(
+    ["log", "--oneline", `${defaultBranch}..${currentBranch}`],
+    params,
+  );
   const mergeBase = await runGitCommand(["merge-base", defaultBranch, currentBranch], params);
-  const changes = await runGitCommand(["diff", mergeBase, currentBranch], params);
-  return changes;
+  const changes = await runGitCommand(["diff", `${mergeBase}...${currentBranch}`], params);
+  return `# Commits:\n${messages}\n\n# Changes:\n${changes}`;
 }
