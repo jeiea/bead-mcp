@@ -14,10 +14,13 @@ export async function getProvisionalPrChanges(
   const defaultBranch = await getDefaultBranch(path, { git, sourceBranch: currentBranch });
 
   const params = { git, cwd: path, trimEnd: true };
+  const logCommands = ["log", "--oneline", `${defaultBranch}..${currentBranch}`];
+  const messages = await runGitCommand(logCommands, params);
   const mergeBase = await runGitCommand(["merge-base", defaultBranch, currentBranch], params);
-  const changes = await runGitCommand(["diff", mergeBase, currentBranch], params);
+  const changes = await runGitCommand(["diff", `${mergeBase}...${currentBranch}`], params);
+  const text = `# Commits:\n${messages}\n\n# Changes:\n${changes}`;
 
-  return cutTextLines(changes, { cursor, maxLines });
+  return cutTextLines(text, { cursor, maxLines });
 }
 
 function cutTextLines(text: string, { cursor, maxLines }: { cursor?: string; maxLines?: number }) {
