@@ -1,5 +1,5 @@
 import { assertEquals, assertExists } from "jsr:@std/assert";
-import { getProvisionalPrChanges, _internals } from "./get_provisional_pr_changes.ts";
+import { _internals, getProvisionalPrChanges } from "./get_provisional_pr_changes.ts";
 
 const { cutTextLines } = _internals;
 
