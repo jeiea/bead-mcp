@@ -57,15 +57,24 @@ export function createServer() {
       },
       inputSchema: {
         path: z.string(),
+        cursor: z.string().optional(),
+        maxLines: z.number().optional(),
+      },
+      outputSchema: {
+        type: z.literal("text"),
+        text: z.string(),
+        nextCursor: z.string().optional(),
       },
     },
     async (args) => {
       try {
-        const changes = await getProvisionalPrChanges(args.path);
-        return { content: [{ type: "text", text: changes }] };
+        const { path, ...options } = args;
+        const changes = await getProvisionalPrChanges(path, options);
+        return { content: [{ type: "text", ...changes }] };
       } catch (error) {
         return {
           content: [{ type: "text", text: `Error getting provisional PR changes: ${error}` }],
+          isError: true,
         };
       }
     },
