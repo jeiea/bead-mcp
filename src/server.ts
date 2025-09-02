@@ -26,7 +26,6 @@ export function createServer() {
   server.registerTool(
     "get-default-branch",
     {
-      title: "Get Default Branch",
       description: "Get the default branch of a git repository",
       annotations: {
         readOnlyHint: true,
@@ -49,7 +48,6 @@ export function createServer() {
   server.registerTool(
     "get-provisional-pr-changes",
     {
-      title: "Get Provisional PR Changes",
       description: "Get PR changes when opening from the current branch.",
       annotations: {
         readOnlyHint: true,
@@ -59,11 +57,6 @@ export function createServer() {
         path: z.string(),
         cursor: z.string().optional(),
         maxLines: z.number().optional(),
-      },
-      outputSchema: {
-        type: z.literal("text"),
-        text: z.string(),
-        nextCursor: z.string().optional(),
       },
     },
     async (args) => {
