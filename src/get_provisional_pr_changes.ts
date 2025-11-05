@@ -8,6 +8,11 @@ export async function getProvisionalPrChanges(
   path: string,
   { cursor, maxLines }: { cursor?: string; maxLines?: number },
 ) {
+  const text = await getProvisionalPrChangesText(path);
+  return cutTextLines(text, { cursor, maxLines });
+}
+
+export async function getProvisionalPrChangesText(path: string): Promise<string> {
   const git = await whichGit();
 
   const currentBranch = await getCurrentBranch(git, path);
@@ -18,9 +23,8 @@ export async function getProvisionalPrChanges(
   const messages = await runGitCommand(logCommands, params);
   const mergeBase = await runGitCommand(["merge-base", defaultBranch, currentBranch], params);
   const changes = await runGitCommand(["diff", `${mergeBase}...${currentBranch}`], params);
-  const text = `# Commits:\n${messages}\n\n# Changes:\n${changes}`;
 
-  return cutTextLines(text, { cursor, maxLines });
+  return `# Commits:\n${messages}\n\n# Changes:\n${changes}`;
 }
 
 function cutTextLines(text: string, { cursor, maxLines }: { cursor?: string; maxLines?: number }) {
