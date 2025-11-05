@@ -24,6 +24,10 @@ export async function getProvisionalPrChangesText(path: string): Promise<string>
   const mergeBase = await runGitCommand(["merge-base", defaultBranch, currentBranch], params);
   const changes = await runGitCommand(["diff", `${mergeBase}...${currentBranch}`], params);
 
+  const isEmpty = messages.trim() === "" && changes.trim() === "";
+  if (isEmpty) {
+    return "No changes found";
+  }
   return `# Commits:\n${messages}\n\n# Changes:\n${changes}`;
 }
 
