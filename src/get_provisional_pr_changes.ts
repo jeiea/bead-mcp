@@ -28,7 +28,13 @@ export async function getProvisionalPrChangesText(path: string): Promise<string>
   if (isEmpty) {
     return "No changes found";
   }
-  return `# Commits:\n${messages}\n\n# Changes:\n${changes}`;
+  return `# ${defaultBranch}..${currentBranch}
+  
+# Commits:
+${messages}
+
+# Changes:
+${changes}`;
 }
 
 function cutTextLines(text: string, { cursor, maxLines }: { cursor?: string; maxLines?: number }) {

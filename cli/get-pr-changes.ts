@@ -18,17 +18,7 @@ async function main() {
   });
 
   if (args.help) {
-    console.log(`Usage: deno run --allow-all bin/get-pr-changes.ts [options]
-
-Options:
-  --path, -p <path>  Git repository path (default: current directory)
-  --help, -h         Show this help message
-
-Examples:
-  deno run --allow-all bin/get-pr-changes.ts
-  deno run --allow-all bin/get-pr-changes.ts --path=/path/to/repo
-  deno run --allow-all bin/get-pr-changes.ts -p ~/project
-`);
+    printHelp();
     Deno.exit(0);
   }
 
@@ -39,4 +29,18 @@ Examples:
     console.error(`Error: ${error instanceof Error ? error.message : error}`);
     Deno.exit(1);
   }
+}
+
+function printHelp() {
+  console.info(`Usage: deno run --allow-all bin/get-pr-changes.ts [options]
+
+Options:
+  --path, -p <path>  Git repository path (default: current directory)
+  --help, -h         Show this help message
+
+Examples:
+  deno run --allow-all bin/get-pr-changes.ts
+  deno run --allow-all bin/get-pr-changes.ts --path=/path/to/repo
+  deno run --allow-all bin/get-pr-changes.ts -p ~/project
+`);
 }
